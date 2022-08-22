@@ -15,6 +15,15 @@
     "autoIndex" : true,
     "indexTitle" : "My Note Book",
 
+    "debugMode" : true,
+
+    "moveResource" : true,
+    "resourceWhiteLise" : [
+        "png",
+        "jpg",
+        "jpge"
+    ],
+
     "engineConfig":
     {
         "previewTheme ": "github-light.css",

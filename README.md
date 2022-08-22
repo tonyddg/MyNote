@@ -63,3 +63,4 @@ The markdown encode is powered by [mume](https://github.com/shd101wyy/mume).
 ## todo
 1. 更好地命令与命令选项
 2. 强制刷新/生成文档
+3. 同步更新笔记文件的资源

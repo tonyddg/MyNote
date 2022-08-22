@@ -5,6 +5,8 @@ const mume = require("@shd101wyy/mume");
 
 const updateConfig = JSON.parse( fs.readFileSync("config/update_config.json"));
 
+// Promise 包装的 cp.exec
+// resolve 时返回 stdout
 function asyncExec(command)
 {
     return new Promise((resolve, reject)=>
@@ -18,18 +20,23 @@ function asyncExec(command)
             else
             {
                 err.stdout = stdout;
-                err.stderr = stdout;
+                err.stderr = stderr;
                 reject(err);
             }
         });
     })
 }
 
+// 处理 git log --stat 的结果, 获取文件改动
+// 返回值 {updated, deleted, rename}
+// updated 需要更新的文件
+// deleted 需要删除的文件
+// rename 需要重命名的文件
 function dealLogOut(out)
 {
     let resList = {updated : [], deleted : [], rename : []};
     //const regGetPath = / "?(.+\.md)"?\s*\|/g;
-    const regGetPath = new RegExp(`\n "?(${updateConfig.noteDirPath}/[^>]+\\.md)"?\\s*\\|`, 'g');
+    const regGetPath = new RegExp(`\n "?(${updateConfig.noteDirPath}/[^> ]+\\.md)"?\\s*\\|`, 'g');
     //const regRename = / (.+){(.+) => (.+)}(\S*)\s*\|/g;
     const regRename = new RegExp(`\n "?(${updateConfig.noteDirPath}/.*){(.+) => (.+)}(\\S*)"?\\s*\\|\\s*([0-9]+)`, 'g');
 
@@ -76,11 +83,7 @@ function dealLogOut(out)
     return resList;
 }
 
-//调用 git log --stat=1000 获取所有被修改过的文件
-//result 对象 {updated, deleted, rename}
-//updated 需要更新的文件
-//deleted 需要删除的文件
-//rename 需要重命名的文件
+// 同步调用 git log --stat=1000 并获文件改动
 function gitGetUpdatedMd(refTimes = 1)
 {
     return new Promise((resolve, reject)=>
@@ -100,6 +103,28 @@ function gitGetUpdatedMd(refTimes = 1)
     })
 }
 
+// 通过 console.log 解释 dealLogOut 的结果
+function explainReslist(resList)
+{
+    console.log("以下文件被更新");
+    for(let i of resList.updated)
+    {
+        console.log(i);
+    }
+    console.log("以下文件被删除");
+    for(let i of resList.deleted)
+    {
+        console.log(i);
+    }
+    console.log("以下文件被重命名");
+    for(let i of resList.rename)
+    {
+        console.log(i.from, '=>', i.to);
+    }
+}
+
+// 安全同步移动文件
+// 当 to 路径下的文件夹不存在时自动创建
 function safeMove(from, to)
 {
     if(!fs.existsSync(from))
@@ -115,6 +140,10 @@ function safeMove(from, to)
     return true;
 }
 
+// 通过笔记文件路径, 解析其对应的文档路径
+// 返回对象 {exportPath, docPath}
+// exportPath 使用引擎导出的路径
+// docPath 转移保存路径
 function getDocPath(notePath)
 {
     const regMatchMd = new RegExp("md$");
@@ -126,6 +155,7 @@ function getDocPath(notePath)
     return res;
 }
 
+// 根据 git log --stat=1000 获取的文件改动, 同步删除文档
 function deleteDoc(noteList)
 {
     for(let notePath of noteList)
@@ -138,6 +168,7 @@ function deleteDoc(noteList)
     }
 }
 
+// 根据 git log --stat=1000 获取的文件改动, 同步重命名文档
 function renameDoc(noteList)
 {
     for(let notePath of noteList)
@@ -146,6 +177,7 @@ function renameDoc(noteList)
     }
 }
 
+// 将笔记文件导出为文档文件, 并移动到文档保存位置
 async function exportNote(notePath)
 {
     const projectPath = path.resolve(".", "config/.mume");
@@ -164,6 +196,7 @@ async function exportNote(notePath)
     safeMove(docPath.exportPath, docPath.docPath);
 }
 
+// 根据 git log --stat=1000 获取的文件改动, 同步更新文档
 async function createDoc(noteList)
 {
     for(let notePath of noteList)
@@ -172,6 +205,11 @@ async function createDoc(noteList)
     }
 }
 
+// 遍历目录下所有文件, 生成对目标文件的 markdown 导航
+// root 遍历的根目录
+// workroot index 所在的目录
+// target 目标文件的类型 使用 | 标记多种文件(正则表达式语法)
+// title 生成导航的一级标题, 默认为 {root}
 function exportIndexMd(root, workroot, target, title, layer = 1)
 {
     let content = "";
@@ -228,6 +266,7 @@ function exportIndexMd(root, workroot, target, title, layer = 1)
     else return false;
 }
 
+// 导出文档的导航( html 与 md )
 async function exportIndexHtml()
 {
     let indexMdPath = `${updateConfig.docDirPath}/index.md`
@@ -272,6 +311,11 @@ async function main()
 
     console.log("获取更改");
     let res = await gitGetUpdatedMd();
+
+    if(updateConfig.debugMode)
+    {
+        explainReslist(res);
+    }
 
     console.log("生成文档");
     await createDoc(res.updated);

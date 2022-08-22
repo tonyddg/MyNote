@@ -19,7 +19,7 @@ git config core.quotepath false
 
 echo "安装 node.js 相关支持"
 # 检查并安装 node.js 相关支持 
-mkdir ./doc
+mkdir ./docs
 mkdir ./note
 cd ./app
 npm --version
@@ -39,6 +39,8 @@ fi
 
 echo "更新仓库"
 # 更新仓库
+# 清除本地当前的Git缓存
+git rm -r --cached .
 git add -A
 git commit
 git push origin main
