@@ -27,7 +27,7 @@ The markdown encode is powered by [mume](https://github.com/shd101wyy/mume).
     "docDirPath" : "doc",
 
     // 提交导出文档文件 (git commit) 的参数
-    "docCommitArgs" : "-m \"Update doc\"",
+    "docCommitArgs" : "-m '更新文档'",
     // 提交笔记文件 (git commit) 的参数
     "noteCommitArgs" : "",
     
@@ -37,6 +37,11 @@ The markdown encode is powered by [mume](https://github.com/shd101wyy/mume).
     "pushArgs" : "",
     // 是否自动上传
     "autoPush": true,
+
+    // 是否自动生成index
+    "autoIndex" : true,
+    // index 的标题(一级标题) null 则使用默认
+    "indexTitle" : null,
 
     // markdown 导出引擎参数, 见 https://github.com/shd101wyy/mume
     "engineConfig":
@@ -56,5 +61,5 @@ The markdown encode is powered by [mume](https://github.com/shd101wyy/mume).
 }
 ```
 ## todo
-1. 自动生成 index.html/index.md
-2. 中文路径支持
+1. 更好地命令与命令选项
+2. 强制刷新/生成文档

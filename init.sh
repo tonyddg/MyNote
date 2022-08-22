@@ -1,4 +1,5 @@
-echo" 检查 git 是否安装"
+
+echo " 检查 git 是否安装"
 # 检查 git 是否安装
 git --version
 if [ 0 != $? ]
@@ -13,6 +14,8 @@ git pull
 rm .gitignore
 mv real.gitignore .gitignore
 rm README.md
+# 解决中文乱码问题
+git config core.quotepath false
 
 echo "安装 node.js 相关支持"
 # 检查并安装 node.js 相关支持 

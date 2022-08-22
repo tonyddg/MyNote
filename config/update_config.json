@@ -5,12 +5,15 @@
     "noteDirPath" : "note",
     "docDirPath" : "doc",
 
-    "docCommitArgs" : "-m \"Update doc\"",
+    "docCommitArgs" : "-m '更新文档'",
     "noteCommitArgs" : "",
     
     "objBranch" : "main",
     "pushArgs" : "",
     "autoPush": true,
+
+    "autoIndex" : true,
+    "indexTitle" : "My Note Book",
 
     "engineConfig":
     {

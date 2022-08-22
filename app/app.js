@@ -1,5 +1,3 @@
-//bug: 不支持中文
-
 const cp = require("child_process");
 const path = require("path");
 const fs = require("fs");
@@ -11,7 +9,7 @@ function asyncExec(command)
 {
     return new Promise((resolve, reject)=>
     {
-        cp.exec(command, function(err,stdout)
+        cp.exec(command, function(err,stdout, stderr)
         {
             if(err == null)
             {
@@ -20,6 +18,7 @@ function asyncExec(command)
             else
             {
                 err.stdout = stdout;
+                err.stderr = stdout;
                 reject(err);
             }
         });
@@ -30,9 +29,9 @@ function dealLogOut(out)
 {
     let resList = {updated : [], deleted : [], rename : []};
     //const regGetPath = / "?(.+\.md)"?\s*\|/g;
-    const regGetPath = new RegExp(` "?(${updateConfig.noteDirPath}/.+\\.md)"?\\s*\\|`, 'g');
-    //const regRename = / (.+){(.+) => (.+)}\s*\|\s*([0-9]+)/g;
-    const regRename = new RegExp(` (${updateConfig.noteDirPath}/.+){(.+\\.md) => (.+\\.md)}\\s*\\|\\s*([0-9]+)`, 'g');
+    const regGetPath = new RegExp(`\n "?(${updateConfig.noteDirPath}/[^>]+\\.md)"?\\s*\\|`, 'g');
+    //const regRename = / (.+){(.+) => (.+)}(\S*)\s*\|/g;
+    const regRename = new RegExp(`\n "?(${updateConfig.noteDirPath}/.*){(.+) => (.+)}(\\S*)"?\\s*\\|\\s*([0-9]+)`, 'g');
 
     let resItr = out.matchAll(regGetPath);
     for(let res of resItr)
@@ -52,19 +51,28 @@ function dealLogOut(out)
     resItr = out.matchAll(regRename);
     for(let res of resItr)
     {
-        if(res[4] === '0')
+        let from = (res[1] + res[2] + res[4]).trim();
+        let to = (res[1] + res[3] + res[4]).trim();
+        if(from.match(regGetPath))
         {
-            //仅重命名
-            resList.rename.push({from : res[1] + res[2], to : res[1] + res[3]});
+            continue;
         }
         else
         {
-            //重命名且修改过内容
-            resList.updated.push(res[1] + res[3]);
-            resList.deleted.push(res[1] + res[2]);
+            if(res[5] === '0')
+            {
+                //仅重命名
+                resList.rename.push({from : from, to : to});
+            }
+            else
+            {
+                //重命名且修改过内容
+                resList.updated.push(to);
+                resList.deleted.push(from);
+            }            
         }
-    }
 
+    }
     return resList;
 }
 
@@ -138,60 +146,167 @@ function renameDoc(noteList)
     }
 }
 
+async function exportNote(notePath)
+{
+    const projectPath = path.resolve(".", "config/.mume");
+    const engineConfig = updateConfig.engineConfig;
+    updateConfig.engineConfig.configPath = path.resolve(".", "config/.mume");
+
+    const engine = new mume.MarkdownEngine({
+        filePath: notePath,
+        projectDirectoryPath: projectPath,
+        config: engineConfig,
+    });
+    // html export
+    await engine.htmlExport(updateConfig.exportConfig);
+
+    let docPath = getDocPath(notePath);
+    safeMove(docPath.exportPath, docPath.docPath);
+}
+
 async function createDoc(noteList)
 {
-    const configPath = path.resolve(__dirname, ".mume");
-    const projectPath = path.resolve(process.argv[1], "config/.mume");
-    const engineConfig = updateConfig.engineConfig;
-    updateConfig.engineConfig.configPath = configPath;
-
     for(let notePath of noteList)
     {
-        const engine = new mume.MarkdownEngine({
-            filePath: notePath,
-            projectDirectoryPath: projectPath,
-            config: engineConfig,
-        });
-        // html export
-        await engine.htmlExport(updateConfig.exportConfig);
-
-        let docPath = getDocPath(notePath);
-        safeMove(docPath.exportPath, docPath.docPath);
+        await exportNote(notePath);
     }
+}
+
+function exportIndexMd(root, workroot, target, title, layer = 1)
+{
+    let content = "";
+    let subContent = "";
+    let dir = fs.readdirSync(root);
+    let hasContent = false;
+    const matchTarget = new RegExp(`(.+)\\.${target}`);
+
+    dir.forEach(file=>{
+        if(file == '.' || file == '..')
+        {
+            return;
+        }
+
+        let fullPath = path.resolve(root, file);
+        let stats = fs.statSync(fullPath)
+
+        if(stats.isDirectory())
+        {
+            let subres = exportIndexMd(fullPath, workroot, target, null, layer + 1);
+            if(subres)
+            {
+                subContent = subContent.concat(subres);
+                hasContent = true;
+            }
+        }
+        else if(stats.isFile())
+        {
+            let matchRes = file.match(matchTarget);
+            if(matchRes)
+            {
+                content = content
+                .concat(`* [${matchRes[1]}](${path.relative(workroot, fullPath).replace(/\\/g, "/")})\n`);
+                hasContent = true;
+            }
+        }
+    })
+
+    if(hasContent)
+    {
+        let head = "#";
+        head = head.repeat(layer);
+
+        if(layer === 1 && typeof(title) === "string")
+        {
+            head = head.concat(` ${title}\n`);
+        }
+        else
+        {
+            head = head.concat(` ${path.basename(root)}\n`);
+        }
+        return head + content + subContent;
+    }
+    else return false;
+}
+
+async function exportIndexHtml()
+{
+    let indexMdPath = `${updateConfig.docDirPath}/index.md`
+    let fileStream = fs.createWriteStream(indexMdPath);
+    let indexMd = exportIndexMd(updateConfig.docDirPath, updateConfig.docDirPath, "html", updateConfig.indexTitle);
+    
+    if(indexMd)
+    {
+        await new Promise((resolve, reject)=>
+        {
+            fileStream.write(indexMd, "utf-8", (error)=>
+            {
+                if(error)
+                {
+                    reject(error);
+                }
+                else
+                {
+                    resolve();
+                }
+            });
+        })
+        
+        await exportNote(indexMdPath);
+    }
+    else
+    {
+        console.log("empty index");
+    }
+
+    fileStream.close();     
 }
 
 async function main()
 {
-    await asyncExec(`git add ${updateConfig.noteDirPath} ${updateConfig.noteAddArgs}`);
-    await asyncExec(`git commit ${updateConfig.noteDirPath} ${updateConfig.noteCommitArgs}`);
+    console.log("初始化引擎");
+    await mume.init(path.resolve(".", "config/.mume"));
 
+    console.log("提交更改");
+    await asyncExec(`git add ${updateConfig.noteDirPath} ${updateConfig.noteAddArgs}`);
+    await asyncExec(`git commit ${updateConfig.noteCommitArgs}`);
+
+    console.log("获取更改");
     let res = await gitGetUpdatedMd();
 
+    console.log("生成文档");
     await createDoc(res.updated);
     deleteDoc(res.deleted);
     renameDoc(res.rename);
 
+    if(updateConfig.autoIndex)
+    {
+        console.log("生成Index");
+        exportIndexHtml();
+    }
+
+    console.log("提交文档");
     await asyncExec(`git add ${updateConfig.docDirPath} ${updateConfig.docAddArgs}`);
-    await asyncExec(`git commit ${updateConfig.docDirPath} ${updateConfig.docCommitArgs}`);   
+    await asyncExec(`git commit ${updateConfig.docCommitArgs}`);
 
     if(updateConfig.autoPush)
     {
+        console.log("上传");
         await asyncExec(`git push origin ${updateConfig.objBranch} ${updateConfig.pushArgs}`); 
     }
 
-    return true;
+    return process.exit();
 }
 
 main().catch(error=>{
-    if(error.cmd != undefined)
-    {
-        console.log("update fail with cmd:");
-        console.log(error.cmd);
-        console.log("with output:");
-        console.log(error.stdout);        
-    }
-    else
-    {
-        console.log(error);
-    }
+    console.log(error);
+    process.exit();
 });
+
+//console.log(exportIndexMd("doc", "doc", "html", null));
+// let fileStream = fs.createWriteStream("note/index.md");
+// fileStream.write(exportIndexMd("doc", "doc", "html", null), "utf-8");
+// fileStream.close();
+
+// exportNote("note/index.md").catch(err=>{
+//     console.log(err);
+// })
