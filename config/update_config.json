@@ -1,0 +1,29 @@
+{
+    "noteAddArgs" : "",
+    "docAddArgs" : "",
+
+    "noteDirPath" : "note",
+    "docDirPath" : "doc",
+
+    "docCommitArgs" : "-m \"Update doc\"",
+    "noteCommitArgs" : "",
+    
+    "objBranch" : "main",
+    "pushArgs" : "",
+    "autoPush": true,
+
+    "engineConfig":
+    {
+        "previewTheme ": "github-light.css",
+        "revealjsTheme ": "white.css",
+        "codeBlockTheme ": "default.css",
+        "printBackground ": true,
+        "enableScriptExecution ": true
+    },
+
+    "exportConfig":
+    {
+        "offline": false, 
+        "runAllCodeChunks": true
+    }
+}
